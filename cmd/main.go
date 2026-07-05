@@ -5,22 +5,24 @@ import (
 	"log"
 	"time"
 
-	"github.com/lattots/gonum/pkg/matrix"
+	"github.com/lattots/gonum/mat"
 
 	"github.com/lattots/nnfs_go/pkg/neural_net"
 	"github.com/lattots/nnfs_go/pkg/util"
 )
 
-const learningDataFilename = "./data/mnist_train.csv"
-const testingDataFilename = "./data/mnist_test.csv"
+const (
+	learningDataFilename = "./data/mnist_train.csv"
+	testingDataFilename  = "./data/mnist_test.csv"
+)
 
 func main() {
-	trainingData, err := util.ReadCSVToFloat64(learningDataFilename)
+	trainingData, err := util.ReadCSVToFloat32(learningDataFilename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	slicedTrainingData := trainingData[:1000]
+	slicedTrainingData := trainingData[:10000]
 
 	output, err := util.ExtractOutput(&slicedTrainingData, 0)
 	if err != nil {
@@ -28,20 +30,20 @@ func main() {
 	}
 
 	inputLayerConfig := &neuralnet.LayerConfig{InputSize: len(slicedTrainingData[0]), NeuronCount: 32, ActivationType: neuralnet.ReLU, InitType: neuralnet.He}
-	// firstHiddenConfig := &neuralnet.LayerConfig{NeuronCount: 32, ActivationType: neuralnet.ReLU, InitType: neuralnet.He}
-	// secondHiddenConfig := &neuralnet.LayerConfig{NeuronCount: 32, ActivationType: neuralnet.ReLU, InitType: neuralnet.He}
-	// thirdHiddenConfig := &neuralnet.LayerConfig{NeuronCount: 32, ActivationType: neuralnet.ReLU, InitType: neuralnet.He}
+	firstHiddenConfig := &neuralnet.LayerConfig{NeuronCount: 32, ActivationType: neuralnet.ReLU, InitType: neuralnet.He}
+	secondHiddenConfig := &neuralnet.LayerConfig{NeuronCount: 32, ActivationType: neuralnet.ReLU, InitType: neuralnet.He}
+	thirdHiddenConfig := &neuralnet.LayerConfig{NeuronCount: 32, ActivationType: neuralnet.ReLU, InitType: neuralnet.He}
 	outputLayerConfig := &neuralnet.LayerConfig{NeuronCount: 10, ActivationType: neuralnet.Softmax, InitType: neuralnet.He}
 
 	nnConfig := neuralnet.Config{
-		NumEpochs:    100,
+		NumEpochs:    1000,
 		LearningRate: 0.1,
 		LossFunction: neuralnet.CrossEntropy,
 		LayerConfigs: []*neuralnet.LayerConfig{
 			inputLayerConfig,
-			// firstHiddenConfig,
-			// secondHiddenConfig,
-			// thirdHiddenConfig,
+			firstHiddenConfig,
+			secondHiddenConfig,
+			thirdHiddenConfig,
 			outputLayerConfig,
 		},
 	}
@@ -52,7 +54,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	inputMatrix, err := matrix.NewMatrix(slicedTrainingData)
+	inputMatrix, err := mat.New(slicedTrainingData)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -62,14 +64,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	labelMatrix, err := matrix.NewZeroMatrix(len(output), 10)
+	labelMatrix, err := mat.Zeros[float32](len(output), 10)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for i, v := range output {
 		valueInt := int(v)
-		labelMatrix.Data[i][valueInt] = 1
+		labelMatrix.Data[i*labelMatrix.N+valueInt] = 1
 	}
 
 	start := time.Now()
@@ -80,12 +82,12 @@ func main() {
 
 	fmt.Println("Training took", time.Since(start))
 
-	testingData, err := util.ReadCSVToFloat64(testingDataFilename)
+	testingData, err := util.ReadCSVToFloat32(testingDataFilename)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	testingDataSliced := testingData[1000:1100]
+	testingDataSliced := testingData[0:1000]
 
 	testingOutput, err := util.ExtractOutput(&testingDataSliced, 0)
 	if err != nil {
@@ -96,5 +98,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Test complete with success rate of %.3f\n", successRate)
+	fmt.Printf("Test complete with success rate of %.1f %%\n", successRate*100)
 }

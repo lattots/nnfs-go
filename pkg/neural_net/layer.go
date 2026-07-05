@@ -3,42 +3,38 @@ package neuralnet
 import (
 	"fmt"
 
-	"github.com/lattots/gonum/pkg/matrix"
+	"github.com/lattots/gonum/mat"
 )
 
 type layer struct {
-	weights        *matrix.Matrix
-	biases         *matrix.Matrix
+	weights        *mat.Mat[float32]
+	biases         *mat.Mat[float32]
 	activationType activationFunctionType
 }
 
-func (l *layer) forward(input *matrix.Matrix) (*matrix.Matrix, error) {
-	layerInput, err := input.Multiply(l.weights)
+func (l *layer) forward(input *mat.Mat[float32]) (*mat.Mat[float32], error) {
+	layerInput, err := mat.Dot(input, l.weights)
 	if err != nil {
 		return nil, fmt.Errorf("error calculating layer input: %w", err)
 	}
-	err = addBias(layerInput, l.biases.Data[0])
+	err = addBias(layerInput, l.biases)
 	if err != nil {
 		return nil, fmt.Errorf("error adding bias: %w", err)
 	}
 
-	layerActivations, err := matrix.NewZeroMatrix(layerInput.M, layerInput.N)
+	layerActivations, err := mat.Zeros[float32](layerInput.M, layerInput.N)
 	if err != nil {
 		return nil, fmt.Errorf("error creating layer activations matrix: %w", err)
 	}
 
 	activationFunction := getActivationFunc(l.activationType)
 
-	for i := range layerInput.Data {
-		for j := range layerInput.Data[i] {
-			layerActivations.Data[i][j] = activationFunction(layerInput.Data[i][j])
-		}
-	}
+	layerActivations = mat.Map(layerInput, activationFunction)
 
 	return layerActivations, nil
 }
 
-func newLayer(weights, biases *matrix.Matrix, activationType activationFunctionType) *layer {
+func newLayer(weights, biases *mat.Mat[float32], activationType activationFunctionType) *layer {
 	if weights == nil || biases == nil {
 		fmt.Println("weights or biases are nil")
 		return nil
@@ -83,16 +79,16 @@ type LayerConfig struct {
 }
 
 // forwardPreActivation calculates the weighted sum plus bias (z = input * weights + bias).
-func (l *layer) forwardPreActivation(input *matrix.Matrix) (*matrix.Matrix, error) {
+func (l *layer) forwardPreActivation(input *mat.Mat[float32]) (*mat.Mat[float32], error) {
 	// z = input * weights
-	z, err := input.Multiply(l.weights)
+	z, err := mat.Dot(input, l.weights)
 	if err != nil {
 		return nil, fmt.Errorf("error multiplying input by weights: %w", err)
 	}
 
 	// z = z + bias
 	// The addBias function broadcasts the bias vector to each row of the matrix z.
-	err = addBias(z, l.biases.Data[0])
+	err = addBias(z, l.biases)
 	if err != nil {
 		return nil, fmt.Errorf("error adding bias: %w", err)
 	}
@@ -100,16 +96,10 @@ func (l *layer) forwardPreActivation(input *matrix.Matrix) (*matrix.Matrix, erro
 	return z, nil
 }
 
-func (l *layer) forwardActivation(z *matrix.Matrix) (*matrix.Matrix, error) {
+func (l *layer) forwardActivation(z *mat.Mat[float32]) (*mat.Mat[float32], error) {
 	activationFunction := getActivationFunc(l.activationType)
 
-	// The Map function is a common utility in matrix libraries.
-	// It applies a given function to every element of the matrix, returning a new matrix.
-	// If your library doesn't have Map, you can use your original nested for-loop implementation.
-	a, err := z.Map(activationFunction)
-	if err != nil {
-		return nil, fmt.Errorf("error applying activation function: %w", err)
-	}
+	a := mat.Map(z, activationFunction)
 
 	return a, nil
 }

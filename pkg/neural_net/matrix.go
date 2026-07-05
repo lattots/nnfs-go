@@ -5,10 +5,10 @@ import (
 	"math"
 	"math/rand"
 
-	"github.com/lattots/gonum/pkg/matrix"
+	"github.com/lattots/gonum/mat"
 )
 
-func randomMatrix(m, n int, initType InitializationType, seed int) (*matrix.Matrix, error) {
+func randomMatrix(m, n int, initType InitializationType, seed int) (*mat.Mat[float32], error) {
 	randSrc := rand.NewSource(int64(seed))
 	randGen := rand.New(randSrc)
 	switch initType {
@@ -21,36 +21,36 @@ func randomMatrix(m, n int, initType InitializationType, seed int) (*matrix.Matr
 	}
 }
 
-func xavierInitialization(rows, cols int, randGen *rand.Rand) (*matrix.Matrix, error) {
-	limit := math.Sqrt(6.0 / float64(rows+cols))
+func xavierInitialization(rows, cols int, randGen *rand.Rand) (*mat.Mat[float32], error) {
+	limit := float32(math.Sqrt(6.0 / float64(rows+cols)))
 	return randomMatrixWithRange(rows, cols, -limit, limit, randGen)
 }
 
-func heInitialization(rows, cols int, randGen *rand.Rand) (*matrix.Matrix, error) {
-	stddev := math.Sqrt(2.0 / float64(rows))
+func heInitialization(rows, cols int, randGen *rand.Rand) (*mat.Mat[float32], error) {
+	stddev := float32(math.Sqrt(2.0 / float64(rows)))
 	return randomMatrixWithStandardDeviation(rows, cols, stddev, randGen)
 }
 
-func randomMatrixWithRange(rows, cols int, min, max float64, randGen *rand.Rand) (*matrix.Matrix, error) {
-	data := make([][]float64, rows)
+func randomMatrixWithRange(rows, cols int, min, max float32, randGen *rand.Rand) (*mat.Mat[float32], error) {
+	data := make([][]float32, rows)
 	for i := range rows {
-		data[i] = make([]float64, cols)
+		data[i] = make([]float32, cols)
 		for j := range cols {
-			data[i][j] = min + (max-min)*randGen.Float64()
+			data[i][j] = min + (max-min)*randGen.Float32()
 		}
 	}
-	return matrix.NewMatrix(data)
+	return mat.New(data)
 }
 
-func randomMatrixWithStandardDeviation(rows, cols int, stddev float64, randGen *rand.Rand) (*matrix.Matrix, error) {
-	data := make([][]float64, rows)
+func randomMatrixWithStandardDeviation(rows, cols int, stddev float32, randGen *rand.Rand) (*mat.Mat[float32], error) {
+	data := make([][]float32, rows)
 	for i := range rows {
-		data[i] = make([]float64, cols)
+		data[i] = make([]float32, cols)
 		for j := range cols {
-			data[i][j] = randGen.NormFloat64() * stddev // Use normal distribution
+			data[i][j] = float32(randGen.NormFloat64()) * stddev // Use normal distribution
 		}
 	}
-	return matrix.NewMatrix(data)
+	return mat.New(data)
 }
 
 type InitializationType int
@@ -60,47 +60,27 @@ const (
 	He
 )
 
-func addBias(m *matrix.Matrix, b []float64) error {
-	if len(b) != m.N {
-		return fmt.Errorf("matrix doesn't have the same number of columns as biases\n%d != %d", m.N, len(b))
+func addBias(m, b *mat.Mat[float32]) error {
+	if !b.IsVector() {
+		return fmt.Errorf("bias must be a vector")
 	}
-	for i := 0; i < m.M; i++ {
-		for j := 0; j < m.N; j++ {
-			m.Data[i][j] += b[j]
-		}
-	}
+
+	m = mat.AddRowVector(m, b)
+
 	return nil
 }
 
-func oneMatrix(m, n int) (*matrix.Matrix, error) {
-	mat, err := matrix.NewZeroMatrix(m, n)
-	if err != nil {
-		return nil, fmt.Errorf("error creating zero matrix: %w", err)
-	}
-	for i := range m {
-		for j := range n {
-			mat.Data[i][j] = 1
-		}
-	}
-	return mat, nil
-}
-
 // NormalizeMatrix scales all values in the matrix to range from 0-1 while preserving their relative sizes
-func NormalizeMatrix(m *matrix.Matrix) (*matrix.Matrix, error) {
-	var largestAbs float64 = 0
+func NormalizeMatrix(m *mat.Mat[float32]) (*mat.Mat[float32], error) {
+	var largestAbs float32 = 0
 	for i := range m.Data {
-		for j := range m.Data[i] {
-			val := math.Abs(m.Data[i][j])
-			if val > largestAbs {
-				largestAbs = val
-			}
+		val := float32(math.Abs(float64(m.Data[i])))
+		if val > largestAbs {
+			largestAbs = val
 		}
 	}
 
-	res, err := matrix.NewMatrix(m.Data)
-	if err != nil {
-		return nil, fmt.Errorf("error creating result matrix: %w", err)
-	}
-	res.Scale(1 / largestAbs)
+	res := mat.Scale(m, 1/largestAbs)
+
 	return res, nil
 }

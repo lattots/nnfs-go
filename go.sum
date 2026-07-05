@@ -1,2 +1,8 @@
 github.com/lattots/gonum v0.0.0-20250823161754-f435dfbcc634 h1:emWxq5ScMwjqesDs0sTqUBRGcg2XGtGa6y0s0bSfzHE=
 github.com/lattots/gonum v0.0.0-20250823161754-f435dfbcc634/go.mod h1:bEv+phMmWirWH5ygkP1dXfCZV3qy742nGoaAuo6bQtU=
+github.com/lattots/gonum v0.0.0-20260701195621-c8fc17cac2d3 h1:zWTArFl/zfMsDvGJHWkYMBf+YTIBagIJO4Af1uGKOws=
+github.com/lattots/gonum v0.0.0-20260701195621-c8fc17cac2d3/go.mod h1:bEv+phMmWirWH5ygkP1dXfCZV3qy742nGoaAuo6bQtU=
+github.com/lattots/gonum v0.0.0-20260705162621-2767c10c845a h1:/lDJquSsZu13vt9mkAYmI5A5rHxbFn11I2yIRQp/csM=
+github.com/lattots/gonum v0.0.0-20260705162621-2767c10c845a/go.mod h1:bEv+phMmWirWH5ygkP1dXfCZV3qy742nGoaAuo6bQtU=
+github.com/lattots/gonum v0.0.0-20260705164036-d1ece1889689 h1:pbgAYhBO6UwGz5aFo2fWDYcsuDqbjlt9iGguDlzj9jA=
+github.com/lattots/gonum v0.0.0-20260705164036-d1ece1889689/go.mod h1:bEv+phMmWirWH5ygkP1dXfCZV3qy742nGoaAuo6bQtU=

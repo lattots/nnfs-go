@@ -1,16 +1,16 @@
 package neuralnet
 
 import (
-	"github.com/lattots/gonum/pkg/matrix"
+	"github.com/lattots/gonum/mat"
 
 	"github.com/lattots/nnfs_go/pkg/mathematic"
 )
 
 // activationFunc type for activation functions
-type activationFunc func(float64) float64
+type activationFunc func(float32) float32
 
 // activationDerivative type for activation function derivatives
-type activationDerivative func(float64) float64
+type activationDerivative func(float32) float32
 
 // activationType type tells the type of activation function to use
 type activationFunctionType int
@@ -29,7 +29,7 @@ func getActivationFunc(actType activationFunctionType) activationFunc {
 	case ReLU:
 		return mathematic.ReLU
 	case Softmax: // Handle Softmax
-		return func(x float64) float64 { // Adapt to the required type
+		return func(x float32) float32 { // Adapt to the required type
 			// Softmax operates on vector, not single float.
 			// We need to handle it in Predict function.
 			return x
@@ -51,10 +51,10 @@ func getActivationDerivative(actType activationFunctionType) activationDerivativ
 }
 
 // lossFunc for loss functions
-type lossFunc func(predicted *matrix.Matrix, target *matrix.Matrix) (float64, error)
+type lossFunc func(predicted, target *mat.Mat[float32]) (float32, error)
 
 // lossDerivative type for loss function derivatives
-type lossDerivative func(*matrix.Matrix, *matrix.Matrix) (*matrix.Matrix, error)
+type lossDerivative func(predicted, target *mat.Mat[float32]) (*mat.Mat[float32], error)
 
 // LossFunctionType type tells the type of loss function to use
 type LossFunctionType int
@@ -66,7 +66,7 @@ const (
 )
 
 // getLossFunction returns the loss function corresponding to LossFunctionType
-func getLossFunction(lossType LossFunctionType) func(*matrix.Matrix, *matrix.Matrix) (float64, error) {
+func getLossFunction(lossType LossFunctionType) func(*mat.Mat[float32], *mat.Mat[float32]) (float32, error) {
 	switch lossType {
 	case CrossEntropy:
 		return mathematic.CrossEntropy
@@ -78,7 +78,7 @@ func getLossFunction(lossType LossFunctionType) func(*matrix.Matrix, *matrix.Mat
 }
 
 // getLossDerivative returns the loss function derivative corresponding to LossFunctionType
-func getLossDerivative(lossType LossFunctionType) func(*matrix.Matrix, *matrix.Matrix) (*matrix.Matrix, error) {
+func getLossDerivative(lossType LossFunctionType) func(*mat.Mat[float32], *mat.Mat[float32]) (*mat.Mat[float32], error) {
 	switch lossType {
 	case CrossEntropy:
 		return mathematic.CrossEntropyPrime

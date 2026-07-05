@@ -8,9 +8,9 @@ import (
 	"strconv"
 )
 
-// ReadCSVToFloat64 reads a CSV file and returns a [][]float64.
+// ReadCSVToFloat32 reads a CSV file and returns a [][]float32.
 // It skips the header row and handles potential errors during parsing.
-func ReadCSVToFloat64(filename string) ([][]float64, error) {
+func ReadCSVToFloat32(filename string) ([][]float32, error) {
 	// Open the CSV file.
 	f, err := os.Open(filename)
 	if err != nil {
@@ -27,7 +27,7 @@ func ReadCSVToFloat64(filename string) ([][]float64, error) {
 		return nil, fmt.Errorf("failed to read header row: %w", err)
 	}
 
-	data := make([][]float64, 0)
+	data := make([][]float32, 0)
 
 	// Read the remaining rows.
 	for {
@@ -39,13 +39,13 @@ func ReadCSVToFloat64(filename string) ([][]float64, error) {
 			return nil, fmt.Errorf("failed to read CSV record: %w", err)
 		}
 
-		row := make([]float64, len(record))
+		row := make([]float32, len(record))
 		for i, val := range record {
-			floatVal, err := strconv.ParseFloat(val, 64)
+			floatVal, err := strconv.ParseFloat(val, 32)
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse float value '%s': %w", val, err)
 			}
-			row[i] = floatVal
+			row[i] = float32(floatVal)
 		}
 		data = append(data, row)
 	}
@@ -55,7 +55,7 @@ func ReadCSVToFloat64(filename string) ([][]float64, error) {
 
 // ExtractOutput removes and returns the corresponding column index from the data matrix.
 // It modifies the original matrix "data" in place.
-func ExtractOutput(data *[][]float64, outputIndex int) ([]float64, error) {
+func ExtractOutput(data *[][]float32, outputIndex int) ([]float32, error) {
 	if data == nil || len(*data) == 0 {
 		return nil, fmt.Errorf("data matrix is nil or empty")
 	}
@@ -67,7 +67,7 @@ func ExtractOutput(data *[][]float64, outputIndex int) ([]float64, error) {
 		return nil, fmt.Errorf("output index %d is out of range [0, %d]", outputIndex, len((*data)[0])-1)
 	}
 
-	output := make([]float64, numRows)
+	output := make([]float32, numRows)
 	for i := range *data {
 		if len((*data)[i]) != columnCount {
 			return nil, fmt.Errorf("rows have inconsistent lengths")

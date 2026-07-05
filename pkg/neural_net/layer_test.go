@@ -18,7 +18,7 @@ func TestNewRandomLayer(t *testing.T) {
 		InitType:       initType,
 	}
 
-	l := newRandomLayer(conf)
+	l := newRandomLayer(conf, 1)
 	if l == nil {
 		t.Fatal("failed to create random layer")
 	}
@@ -47,12 +47,12 @@ func TestSigmoidPass(t *testing.T) {
 		InitType:       initType,
 	}
 
-	l := newRandomLayer(conf)
+	l := newRandomLayer(conf, 1)
 	if l == nil {
 		t.Fatal("failed to create random layer")
 	}
 
-	input, err := randomMatrix(1, inputSize, initType)
+	input, err := randomMatrix(1, inputSize, initType, 1)
 	if err != nil {
 		t.Error(err)
 	}
