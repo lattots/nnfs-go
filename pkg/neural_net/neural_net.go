@@ -2,11 +2,12 @@ package neuralnet
 
 import (
 	"fmt"
-	"math"
+	"time"
 
 	"github.com/lattots/gonum/mat"
 
 	"github.com/lattots/nnfs_go/pkg/mathematic"
+	"github.com/lattots/nnfs_go/pkg/util"
 )
 
 type Net struct {
@@ -14,8 +15,17 @@ type Net struct {
 	layers []*layer
 }
 
-func NewNet(config Config) *Net {
-	return &Net{config: config}
+func NewNet(config Config) (*Net, error) {
+	net := &Net{config: config}
+	seed := time.Now().Nanosecond()
+	if config.Seed != 0 {
+		seed = config.Seed
+	}
+	err := net.initRandom(seed)
+	if err != nil {
+		return nil, err
+	}
+	return net, nil
 }
 
 type Config struct {
@@ -23,10 +33,12 @@ type Config struct {
 	LearningRate float32
 	LossFunction LossFunctionType
 
+	Seed int
+
 	LayerConfigs []*LayerConfig
 }
 
-func (n *Net) InitRandom(seed int) error {
+func (n *Net) initRandom(seed int) error {
 	n.layers = make([]*layer, len(n.config.LayerConfigs))
 
 	for i := 0; i < len(n.config.LayerConfigs); i++ {
@@ -39,32 +51,35 @@ func (n *Net) InitRandom(seed int) error {
 	return nil
 }
 
-func (n *Net) Train(x, y *mat.Mat[float32]) error {
+func (n *Net) Train(loader *util.DataLoader) error {
 	for epoch := range n.config.NumEpochs {
-		// Get both pre-activations (zs) and activations (activations)
-		zs, activations, err := n.forwardPassAndGetOutputs(x)
-		if err != nil {
-			return fmt.Errorf("failed to forward pass: %w", err)
+		loader.Reset()
+
+		totalLoss := float32(0.0)
+
+		for loader.HasNext() {
+			xBatch, yBatch := loader.NextBatch()
+
+			zs, activations, err := n.forwardPassAndGetOutputs(xBatch)
+			if err != nil {
+				return fmt.Errorf("failed to forward pass: %w", err)
+			}
+
+			finalOutput := activations[len(activations)-1]
+			softmaxOutput := mathematic.SoftmaxMatrix(finalOutput)
+
+			loss, err := getLossFunction(n.config.LossFunction)(softmaxOutput, yBatch)
+			if err != nil {
+				return fmt.Errorf("error calculating loss: %w", err)
+			}
+			totalLoss += loss
+
+			if err = n.backwardPass(yBatch, zs, activations, softmaxOutput); err != nil {
+				return fmt.Errorf("backward pass failed: %w", err)
+			}
 		}
 
-		// The final output before softmax is the last item in activations
-		finalOutput := activations[len(activations)-1]
-
-		// Apply Softmax
-		softmaxOutput := mathematic.SoftmaxMatrix(finalOutput)
-
-		fmt.Println(softmaxOutput)
-
-		loss, err := getLossFunction(n.config.LossFunction)(softmaxOutput, y)
-		if err != nil {
-			return fmt.Errorf("error calculating loss: %w", err)
-		}
-		fmt.Printf("Epoch: %d, Loss: %.4f\n", epoch, loss)
-
-		// Pass zs and the updated activations list to the backward pass
-		if err = n.backwardPass(y, zs, activations, softmaxOutput); err != nil {
-			return fmt.Errorf("backward pass failed: %w", err)
-		}
+		fmt.Printf("Epoch: %d, Avg Loss: %.4f\n", epoch, totalLoss/float32(loader.NumBatches()))
 	}
 	return nil
 }
@@ -129,107 +144,14 @@ func (n *Net) backwardPass(y *mat.Mat[float32], zs, activations []*mat.Mat[float
 		}
 		weightGradient = mat.Scale(weightGradient, n.config.LearningRate/batchSize)
 		n.layers[i].weights = mat.Subtract(n.layers[i].weights, weightGradient)
-		if err != nil {
-			return err
-		}
 
 		biasGradient := mat.SumRows(deltas[i])
 		biasGradient = mat.Scale(biasGradient, n.config.LearningRate/batchSize)
 		n.layers[i].biases = mat.Subtract(n.layers[i].biases, biasGradient)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
 }
-
-// func (n *Net) Train(x, y *matrix.Matrix) error {
-// 	for epoch := range n.config.NumEpochs {
-// 		activations, err := n.forwardPassGetActivations(x)
-// 		if err != nil {
-// 			return fmt.Errorf("failed to forward pass: %w", err)
-// 		}
-//
-// 		activations[len(activations)-1], err = mathematic.SoftmaxMatrix(activations[len(activations)-1])
-// 		if err != nil {
-// 			return fmt.Errorf("failed to softmax last layer activations: %w", err)
-// 		}
-//
-// 		for i := range activations[len(activations)-1].Data[0] {
-// 			fmt.Printf("%.3f ", activations[len(activations)-1].Data[0][i])
-// 		}
-// 		fmt.Println()
-//
-// 		loss, err := getLossFunction(n.config.LossFunction)(activations[len(activations)-1], y)
-// 		if err != nil {
-// 			return fmt.Errorf("error calculating loss: %w", err)
-// 		}
-// 		fmt.Printf("Epoch: %d, Loss: %.4f\n", epoch, loss)
-//
-// 		if err = n.backwardPass(x, y, activations); err != nil {
-// 			return fmt.Errorf("backward pass failed: %w", err)
-// 		}
-// 	}
-// 	return nil
-// }
-//
-// func (n *Net) backwardPass(x, y *matrix.Matrix, activations []*matrix.Matrix) error {
-// 	// For Softmax + CCE, the initial delta is simply (prediction - actual)
-// 	// This combines the derivative of the loss and the derivative of softmax.
-// 	finalDelta := activations[len(activations)-1].Subtract(y)
-//
-// 	deltas := make([]*matrix.Matrix, len(n.layers))
-// 	deltas[len(deltas)-1] = finalDelta
-//
-// 	// Calculate deltas for hidden layers (from right to left)
-// 	for i := len(n.layers) - 2; i >= 0; i-- {
-// 		// Error propagated from the next layer
-// 		errorPropagated, err := deltas[i+1].Multiply(n.layers[i+1].weights.Transpose())
-// 		if err != nil {
-// 			return err
-// 		}
-//
-// 		// Get derivative of the current layer's activation function
-// 		activationDerivative := getActivationDerivative(n.layers[i].activationType)
-// 		slope, err := activations[i].Map(activationDerivative) // Assuming a Map function applies a func to each element
-// 		if err != nil {
-// 			return err
-// 		}
-//
-// 		// Calculate the delta for the current layer
-// 		deltas[i], err = errorPropagated.MultiplyElements(slope)
-// 		if err != nil {
-// 			return err
-// 		}
-// 	}
-//
-// 	// Update weights and biases (from right to left)
-// 	batchSize := float64(x.M)
-// 	for i := len(n.layers) - 1; i >= 0; i-- {
-// 		var prevLayerActivations *matrix.Matrix
-// 		if i == 0 {
-// 			prevLayerActivations = x
-// 		} else {
-// 			prevLayerActivations = activations[i-1]
-// 		}
-//
-// 		// Calculate weight gradient and apply update
-// 		weightGradient, err := prevLayerActivations.Transpose().Multiply(deltas[i])
-// 		if err != nil {
-// 			return err
-// 		}
-// 		weightGradient.Scale(n.config.LearningRate / batchSize) // Average the gradient
-// 		n.layers[i].weights = n.layers[i].weights.Subtract(weightGradient)
-//
-// 		// Calculate bias gradient and apply update
-// 		biasGradient := deltas[i].SumRows()                   // Assumes SumRows sums columns down to a row vector
-// 		biasGradient.Scale(n.config.LearningRate / batchSize) // Average the gradient
-// 		n.layers[i].biases = n.layers[i].biases.Subtract(biasGradient)
-// 	}
-//
-// 	return nil
-// }
 
 func (n *Net) Predict(x *mat.Mat[float32]) (*mat.Mat[float32], error) {
 	res, err := n.forwardPass(x)
@@ -241,38 +163,60 @@ func (n *Net) Predict(x *mat.Mat[float32]) (*mat.Mat[float32], error) {
 	return res, nil
 }
 
-// Test returns an accuracy score of neural nets capability to predict outcomes in testingMatrix
-func (n *Net) Test(testInput [][]float32, expectedOutput []float32) (float32, error) {
-	var correct int
-	for i := range testInput {
-		inputMatrix, err := mat.New([][]float32{testInput[i]})
-		if err != nil {
-			return 0, fmt.Errorf("error creating input matrix: %w", err)
-		}
+// Evaluate returns an accuracy score by running batch predictions through the provided DataLoader.
+func (n *Net) Evaluate(loader *util.DataLoader) (float32, error) {
+	loader.Reset()
 
-		outputMatrix, err := n.Predict(inputMatrix)
+	var correct int
+	var totalSamples int
+
+	for loader.HasNext() {
+		xBatch, yBatch := loader.NextBatch()
+
+		outputBatch, err := n.Predict(xBatch)
 		if err != nil {
 			return 0, fmt.Errorf("error making prediction: %w", err)
 		}
 
-		expected := int(math.Round(float64(expectedOutput[i])))
+		batchSize := xBatch.M
+		numClasses := yBatch.N
 
-		var largest float32 = 0
-		idx := -1
-		for j := range outputMatrix.Data {
-			if outputMatrix.Data[j] > largest {
-				idx = j
-				largest = outputMatrix.Data[j]
+		for i := 0; i < batchSize; i++ {
+			// Find argmax for predicted probabilities
+			predIdx := 0
+			maxPredVal := outputBatch.Data[i*numClasses]
+
+			// Find argmax for target one-hot vector
+			targetIdx := 0
+			maxTargetVal := yBatch.Data[i*numClasses]
+
+			for j := 1; j < numClasses; j++ {
+				pVal := outputBatch.Data[i*numClasses+j]
+				if pVal > maxPredVal {
+					maxPredVal = pVal
+					predIdx = j
+				}
+
+				tVal := yBatch.Data[i*numClasses+j]
+				if tVal > maxTargetVal {
+					maxTargetVal = tVal
+					targetIdx = j
+				}
+			}
+
+			if predIdx == targetIdx {
+				correct++
 			}
 		}
 
-		if idx == expected {
-			correct++
-		}
+		totalSamples += batchSize
 	}
 
-	score := float32(correct) / float32(len(expectedOutput))
-	return score, nil
+	if totalSamples == 0 {
+		return 0, fmt.Errorf("loader provided zero samples for evaluation")
+	}
+
+	return float32(correct) / float32(totalSamples), nil
 }
 
 func (n *Net) forwardPass(x *mat.Mat[float32]) (*mat.Mat[float32], error) {
@@ -288,22 +232,4 @@ func (n *Net) forwardPass(x *mat.Mat[float32]) (*mat.Mat[float32], error) {
 	}
 
 	return res, err
-}
-
-func (n *Net) forwardPassGetActivations(x *mat.Mat[float32]) ([]*mat.Mat[float32], error) {
-	activations := make([]*mat.Mat[float32], len(n.layers))
-	var err error
-	activations[0], err = n.layers[0].forward(x)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := 1; i < len(n.layers); i++ {
-		activations[i], err = n.layers[i].forward(activations[i-1])
-		if err != nil {
-			return nil, fmt.Errorf("error forward passing on layer %d: %w", i, err)
-		}
-	}
-
-	return activations, nil
 }

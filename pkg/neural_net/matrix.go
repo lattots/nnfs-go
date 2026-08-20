@@ -69,18 +69,3 @@ func addBias(m, b *mat.Mat[float32]) error {
 
 	return nil
 }
-
-// NormalizeMatrix scales all values in the matrix to range from 0-1 while preserving their relative sizes
-func NormalizeMatrix(m *mat.Mat[float32]) (*mat.Mat[float32], error) {
-	var largestAbs float32 = 0
-	for i := range m.Data {
-		val := float32(math.Abs(float64(m.Data[i])))
-		if val > largestAbs {
-			largestAbs = val
-		}
-	}
-
-	res := mat.Scale(m, 1/largestAbs)
-
-	return res, nil
-}

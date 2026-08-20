@@ -4,8 +4,11 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"strconv"
+
+	"github.com/lattots/gonum/mat"
 )
 
 // ReadCSVToFloat32 reads a CSV file and returns a [][]float32.
@@ -79,4 +82,42 @@ func ExtractOutput(data *[][]float32, outputIndex int) ([]float32, error) {
 	}
 
 	return output, nil
+}
+
+func ToOneHot(labels []float32, numClasses int) (*mat.Mat[float32], error) {
+	if len(labels) == 0 {
+		return nil, fmt.Errorf("labels slice cannot be empty")
+	}
+	if numClasses <= 0 {
+		return nil, fmt.Errorf("numClasses must be positive, got %d", numClasses)
+	}
+
+	labelMatrix, err := mat.Zeros[float32](len(labels), numClasses)
+	if err != nil {
+		return nil, fmt.Errorf("failed to allocate label matrix: %w", err)
+	}
+
+	for i, v := range labels {
+		classIdx := int(v)
+
+		if float32(classIdx) != v {
+			return nil, fmt.Errorf("label at index %d (%f) is not a whole integer", i, v)
+		}
+		if classIdx < 0 || classIdx >= numClasses {
+			return nil, fmt.Errorf("label at index %d (%d) out of bounds [0, %d)", i, classIdx, numClasses)
+		}
+
+		labelMatrix.Data[i*numClasses+classIdx] = 1.0
+	}
+
+	return labelMatrix, nil
+}
+
+// NormalizeMatrix scales all values in the matrix to range from 0-1 while preserving their relative sizes
+func NormalizeMatrix(m *mat.Mat[float32]) (*mat.Mat[float32], error) {
+	largestAbs := max(float32(math.Abs(float64(mat.Min(m)))), mat.Max(m))
+
+	res := mat.Scale(m, 1/largestAbs)
+
+	return res, nil
 }
